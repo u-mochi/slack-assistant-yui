@@ -1,6 +1,6 @@
 # Slack assistant Yui
 
-![Yui](/static/img/yui.jpg)
+![Yui](/backend/static/img/yui.jpg | width=300)
 
 Slack assistant Yui makes your Slack little more happy :)
 
