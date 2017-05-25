@@ -27,9 +27,9 @@ var (
 // Configuration means configurations of todoist packeage
 type Configuration struct {
 	// API key of Todoist API
-	APIKey string
+	APIKey string "json:api_key"
 	// Updated date of this struct
-	UpdateDate time.Time
+	UpdateDate time.Time "json:update_date"
 }
 
 // getKeyConfiguration returns datastore.Key to manage Configuration
@@ -40,19 +40,19 @@ func getKeyConfiguration(c appengine.Context) *datastore.Key {
 	return keyConfiguration
 }
 
-// WriteConfiguration writes Configuration to Datastore
-func WriteConfiguration(c appengine.Context, config Configuration) (Configuration, error) {
+// SetConfiguration writes Configuration to Datastore
+func SetConfiguration(c appengine.Context, config Configuration) (Configuration, error) {
 	config.UpdateDate = time.Now()
 	_, err := datastore.Put(c, getKeyConfiguration(c), &config)
 	return config, err
 }
 
-// ReadConfiguration reads Configuration from Datastore
-func ReadConfiguration(c appengine.Context) (Configuration, error) {
+// GetConfiguration reads Configuration from Datastore
+func GetConfiguration(c appengine.Context) (Configuration, error) {
 	config := Configuration{}
 	err := datastore.Get(c, getKeyConfiguration(c), &config)
 	if err == datastore.ErrNoSuchEntity {
-		config, err = WriteConfiguration(c, config)
+		config, err = SetConfiguration(c, config)
 	}
 	return config, err
 }
