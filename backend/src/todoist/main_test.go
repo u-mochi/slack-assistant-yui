@@ -1,3 +1,12 @@
+/**
+ * todoist/main_test.go
+ * This file implements model test of todoist package
+ *
+ * auther u-mochi
+ * license MIT
+ */
+
+// Package todoist implements Datamodel of Todoist and client of Todoist API, configurations.
 package todoist
 
 import (

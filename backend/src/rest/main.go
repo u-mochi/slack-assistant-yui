@@ -1,3 +1,12 @@
+/**
+ * rest/main_test.go
+ * This file implements REST framework of rest package
+ *
+ * auther u-mochi
+ * license MIT
+ */
+
+// Package rest implements REST framework of Slack Assistant Yui.
 package rest
 
 import (
@@ -64,12 +73,14 @@ func init() {
 // selectMapping selects registered urlMapping matches specified URL
 func selectMapping(url *url.URL, context appengine.Context) (*urlMapping, string, error) {
 	paths := strings.Split(strings.Trim(url.Path, URLPathSeparator), URLPathSeparator)
-	for _, mapping := range urlMappings {
-		if mapping.prefix == paths[0] && mapping.moduleName == paths[1] && mapping.modelName == paths[2] {
-			if len(paths) > 3 {
-				return &mapping, paths[3], nil
+	if len(paths) > 2 {
+		for _, mapping := range urlMappings {
+			if mapping.prefix == paths[0] && mapping.moduleName == paths[1] && mapping.modelName == paths[2] {
+				if len(paths) > 3 {
+					return &mapping, paths[3], nil
+				}
+				return &mapping, "", nil
 			}
-			return &mapping, "", nil
 		}
 	}
 	context.Infof("mapping of %s not found in %#v", url.Path, urlMappings)
@@ -92,12 +103,12 @@ func handleRequest(key string, writer http.ResponseWriter, request *http.Request
 		funcDelete(key, writer, request, context)
 		return
 	default:
-		RespondMethodNotAllowed(writer, request, context)
+		RespondMethodNotAllowed(key, writer, request, context)
 	}
 }
 
 // RespondMethodNotAllowed responds as HTTP 405 Method Mot Allowed
-func RespondMethodNotAllowed(writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+func RespondMethodNotAllowed(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
 	RespondError(writer, request, context, http.StatusMethodNotAllowed, fmt.Sprintf("%s Method Not Allowed to %s", request.Method, request.URL))
 }
 

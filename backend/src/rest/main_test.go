@@ -1,3 +1,12 @@
+/**
+ * rest/main_test.go
+ * This file implements REST framework test of rest package
+ *
+ * auther u-mochi
+ * license MIT
+ */
+
+// Package rest implements REST framework of Slack Assistant Yui.
 package rest
 
 import (
@@ -103,7 +112,7 @@ func TestRespondMethodNotAllowed(t *testing.T) {
 	if err != nil {
 		t.Fatal(errorOnInit)
 	}
-	RespondMethodNotAllowed(response, request, context)
+	RespondMethodNotAllowed("", response, request, context)
 	assertsEquals(t, http.StatusMethodNotAllowed, response.Code)
 	context.Debugf("Response: %#v\nBody: %s", response, response.Body.String())
 	context.Infof("TestRespondMethodNotAllowed passed.")
