@@ -1,5 +1,7 @@
-runtime: python27
-api_version: 1
+application: slack-assistant-yui
+version: 0-00-001
+runtime: go
+api_version: go1
 threadsafe: yes
 
 automatic_scaling:
@@ -14,6 +16,8 @@ skip_files:
 - ^\.git/.*
 - ^LICENSE\.txt$
 - ^.*start$
+- \.vscode
+- \.envrc
 
 handlers:
 
@@ -29,3 +33,6 @@ handlers:
 
 - url: /js
   static_dir: static/js
+
+- url: /.*
+  script: _go_app

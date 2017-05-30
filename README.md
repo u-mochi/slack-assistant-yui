@@ -1,6 +1,6 @@
 # Slack assistant Yui
 
-![Yui](/static/img/yui.jpg)
+<img src="https://github.com/u-mochi/slack-assistant-yui/blob/master/backend/static/img/yui.jpg" title="Yui" width="300px">
 
 Slack assistant Yui makes your Slack little more happy :)
 
