@@ -25,6 +25,10 @@ handlers:
   static_files: static/index.html
   upload: static/index.html
 
+- url: /config.html
+  static_files: static/config.html
+  upload: static/config.html
+
 - url: /css
   static_dir: static/css
 
