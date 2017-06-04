@@ -14,4 +14,4 @@ dependencies:
     - ${HOME}/go_appengine/goapp build
 test:
   override:
-    - ${HOME}/go_appengine/goapp test
+    - ${HOME}/go_appengine/goapp test ./...
