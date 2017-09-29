@@ -1,6 +1,6 @@
 import {mount} from "enzyme";
 import * as React from "react";
-import {TodoistApiKeyComponent} from "./todoist";
+import {TodoistApiKeyComponent} from "./Todoist";
 
 describe("Todoist components", () => {
   describe("Todoist API key component", () => {
