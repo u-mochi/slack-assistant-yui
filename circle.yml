@@ -19,7 +19,7 @@ dependencies:
   override:
     - ${HOME}/go_appengine/goapp build
     - npm cache clean
-    - npm install
+    - cd ${HOME}/${CIRCLE_PROJECT_REPONAME}/frontend; npm install
 
 test:
   override:
