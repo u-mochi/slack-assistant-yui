@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "strictNullChecks": true,
+    "noUnusedLocals" : true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "outDir": "../backend/src/static/js/",
+    "sourceMap": true,
+    "moduleResolution": "node",
+    "noImplicitAny": true,
+    "lib": ["dom", "es2017"],
+    "module": "es2015",
+    "target": "es5",
+    "jsx": "react"
+  }
+}
