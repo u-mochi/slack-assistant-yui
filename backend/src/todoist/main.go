@@ -10,11 +10,14 @@
 package todoist
 
 import (
+	"context"
+	"net/http"
+	"net/url"
 	"time"
 
-	"appengine/datastore"
-
-	"appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/urlfetch"
 )
 
 const (
@@ -22,6 +25,8 @@ const (
 	kindStringConfiguration = "todoist_configure"
 	// KeyConfigure means string key of Datastore for Configuration.
 	keyStringConfiguration = "key_todoist_configure"
+	// Entry point of todoist Sync API
+	todoistAPIEntryPoint = "https://todoist.com/api/v7/sync"
 )
 
 var (
@@ -38,7 +43,7 @@ type Configuration struct {
 }
 
 // getKeyConfiguration returns datastore.Key to manage Configuration
-func getKeyConfiguration(c appengine.Context) *datastore.Key {
+func getKeyConfiguration(c context.Context) *datastore.Key {
 	if keyConfiguration == nil {
 		keyConfiguration = datastore.NewKey(c, kindStringConfiguration, keyStringConfiguration, 0, nil)
 	}
@@ -46,7 +51,7 @@ func getKeyConfiguration(c appengine.Context) *datastore.Key {
 }
 
 // SetConfiguration writes Configuration to Datastore
-func SetConfiguration(c appengine.Context, config Configuration) (Configuration, error) {
+func SetConfiguration(c context.Context, config Configuration) (Configuration, error) {
 	config.UpdateDate = time.Now()
 	_, err := datastore.Put(c, getKeyConfiguration(c), &config)
 	if err == nil {
@@ -56,12 +61,31 @@ func SetConfiguration(c appengine.Context, config Configuration) (Configuration,
 }
 
 // GetConfiguration reads Configuration from Datastore
-func GetConfiguration(c appengine.Context) (Configuration, error) {
+func GetConfiguration(c context.Context) (Configuration, error) {
 	config := Configuration{}
 	err := datastore.Get(c, getKeyConfiguration(c), &config)
 	if err == datastore.ErrNoSuchEntity {
-		c.Infof("Entity not found. key(%#v)", getKeyConfiguration(c))
+		log.Infof(c, "Entity not found. key(%#v)", getKeyConfiguration(c))
 		config, err = SetConfiguration(c, config)
 	}
 	return config, err
+}
+
+// Sync Todoist
+func Sync(c context.Context) (*http.Response, error) {
+	config, err := GetConfiguration(c)
+	if err != nil {
+		return nil, err
+	}
+	client := urlfetch.Client(c)
+	values := url.Values{}
+	values.Add("token", config.APIKey)
+	values.Add("resource_types", "all")
+	values.Add("sync_token", "*")
+	resp, errResp := client.PostForm(todoistAPIEntryPoint, values)
+	if errResp != nil {
+		return nil, errResp
+	}
+
+	return resp, err
 }

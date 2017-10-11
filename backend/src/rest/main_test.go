@@ -19,23 +19,26 @@ import (
 	"strings"
 	"testing"
 
-	"appengine"
+	"context"
 
-	"appengine/aetest"
+	"google.golang.org/appengine/aetest"
+	"google.golang.org/appengine/log"
 )
 
 // context is Context of this test
 var (
 	// context is Context of this test
-	context aetest.Context
+	ctx context.Context
+	// closure that must be called when the Context is no longer required.
+	done func()
 	// errorOnInit is error on init()
 	errorOnInit error
 )
 
 // Initialize this tests
 func init() {
-	context, errorOnInit = aetest.NewContext(nil)
-	defer context.Close()
+	ctx, done, errorOnInit = aetest.NewContext()
+	defer done()
 }
 
 // createRequest creates Request and ResponseRecorder
@@ -71,9 +74,17 @@ func TestSelectMapping(t *testing.T) {
 	//success test
 	urlMappings = nil
 	var url1 = url.URL{Path: path1}
-	RegieterMapping(prefix, moduleName, modelName, func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {}, func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {}, func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {}, func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {})
-	RegieterMapping(prefix, moduleName, modelName2, func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {}, func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {}, func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {}, func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {})
-	mapping, key, err := selectMapping(&url1, context)
+	RegieterMapping(prefix, moduleName, modelName,
+		func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {},
+		func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {},
+		func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {},
+		func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {})
+	RegieterMapping(prefix, moduleName, modelName2,
+		func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {},
+		func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {},
+		func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {},
+		func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {})
+	mapping, key, err := selectMapping(ctx, &url1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +94,7 @@ func TestSelectMapping(t *testing.T) {
 	assertsEquals(t, key, "")
 
 	url1.Path += keyValue + URLPathSeparator
-	mapping, key, err = selectMapping(&url1, context)
+	mapping, key, err = selectMapping(ctx, &url1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,12 +105,12 @@ func TestSelectMapping(t *testing.T) {
 
 	//fail test
 	url1.Path = path2
-	mapping, key, err = selectMapping(&url1, context)
+	mapping, key, err = selectMapping(ctx, &url1)
 	if err == nil {
 		t.Fatal("Error is not set.")
 	}
 
-	context.Infof("TestselectMapping passed.")
+	log.Infof(ctx, "TestselectMapping passed.")
 }
 
 // TestRespondMethodNotAllowed tests rest.RespondMethodNotAllowed
@@ -112,10 +123,10 @@ func TestRespondMethodNotAllowed(t *testing.T) {
 	if err != nil {
 		t.Fatal(errorOnInit)
 	}
-	RespondMethodNotAllowed("", response, request, context)
+	RespondMethodNotAllowed(ctx, "", response, request)
 	assertsEquals(t, http.StatusMethodNotAllowed, response.Code)
-	context.Debugf("Response: %#v\nBody: %s", response, response.Body.String())
-	context.Infof("TestRespondMethodNotAllowed passed.")
+	log.Debugf(ctx, "Response: %#v\nBody: %s", response, response.Body.String())
+	log.Infof(ctx, "TestRespondMethodNotAllowed passed.")
 }
 
 // TestRespondMethodNotAllowed tests rest.RespondError
@@ -129,10 +140,10 @@ func TestRespondError(t *testing.T) {
 		t.Fatal(errorOnInit)
 	}
 	code := http.StatusBadRequest
-	RespondError(response, request, context, code, "arg1", errors.New("test"))
+	RespondError(ctx, response, request, code, "arg1", errors.New("test"))
 	assertsEquals(t, http.StatusBadRequest, code)
-	context.Debugf("Response: %#v\nBody: %s", response, response.Body.String())
-	context.Infof("TestRespondError passed.")
+	log.Debugf(ctx, "Response: %#v\nBody: %s", response, response.Body.String())
+	log.Infof(ctx, "TestRespondError passed.")
 }
 
 // TestRespondMethodNotAllowed tests rest.RespondError
@@ -151,8 +162,8 @@ func TestRespond(t *testing.T) {
 	}
 	testStuct := sampleStruct{Prop1: "Test", Prop2: 3}
 
-	Respond(response, request, context, testStuct)
-	context.Debugf("Response: %#v\nBody: %s", response, response.Body.String())
+	Respond(ctx, response, request, testStuct)
+	log.Debugf(ctx, "Response: %#v\nBody: %s", response, response.Body.String())
 	var decodedStruct sampleStruct
 	err2 := json.Unmarshal(response.Body.Bytes(), &decodedStruct)
 	if err2 != nil {
@@ -160,7 +171,7 @@ func TestRespond(t *testing.T) {
 	}
 	assertsEquals(t, testStuct.Prop1, decodedStruct.Prop1)
 	assertsEquals(t, testStuct.Prop2, decodedStruct.Prop2)
-	context.Infof("TestRespond passed.")
+	log.Infof(ctx, "TestRespond passed.")
 }
 
 func TestHandleRequest(t *testing.T) {
@@ -179,16 +190,16 @@ func TestHandleRequest(t *testing.T) {
 			isFuncPutCalled = false
 			isFuncDeleteCalled = false
 		}
-		funcGet = func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+		funcGet = func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 			isFuncGetCalled = true
 		}
-		funcPost = func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+		funcPost = func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 			isFuncPostCalled = true
 		}
-		funcPut = func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+		funcPut = func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 			isFuncPutCalled = true
 		}
-		funcDelete = func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+		funcDelete = func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 			isFuncDeleteCalled = true
 		}
 	)
@@ -199,7 +210,7 @@ func TestHandleRequest(t *testing.T) {
 	}
 
 	// Test Option
-	handleRequest("", response, request, context, funcGet, funcPost, funcPut, funcDelete)
+	handleRequest(ctx, "", response, request, funcGet, funcPost, funcPut, funcDelete)
 	assertsEquals(t, http.StatusMethodNotAllowed, response.Code)
 	assertsEquals(t, false, isFuncGetCalled)
 	assertsEquals(t, false, isFuncPostCalled)
@@ -212,7 +223,7 @@ func TestHandleRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(errorOnInit)
 	}
-	handleRequest("", response, request, context, funcGet, funcPost, funcPut, funcDelete)
+	handleRequest(ctx, "", response, request, funcGet, funcPost, funcPut, funcDelete)
 	assertsEquals(t, http.StatusOK, response.Code)
 	assertsEquals(t, true, isFuncGetCalled)
 	assertsEquals(t, false, isFuncPostCalled)
@@ -225,7 +236,7 @@ func TestHandleRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(errorOnInit)
 	}
-	handleRequest("", response, request, context, funcGet, funcPost, funcPut, funcDelete)
+	handleRequest(ctx, "", response, request, funcGet, funcPost, funcPut, funcDelete)
 	assertsEquals(t, http.StatusOK, response.Code)
 	assertsEquals(t, false, isFuncGetCalled)
 	assertsEquals(t, true, isFuncPostCalled)
@@ -238,7 +249,7 @@ func TestHandleRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(errorOnInit)
 	}
-	handleRequest("", response, request, context, funcGet, funcPost, funcPut, funcDelete)
+	handleRequest(ctx, "", response, request, funcGet, funcPost, funcPut, funcDelete)
 	assertsEquals(t, http.StatusOK, response.Code)
 	assertsEquals(t, false, isFuncGetCalled)
 	assertsEquals(t, false, isFuncPostCalled)
@@ -251,7 +262,7 @@ func TestHandleRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(errorOnInit)
 	}
-	handleRequest("", response, request, context, funcGet, funcPost, funcPut, funcDelete)
+	handleRequest(ctx, "", response, request, funcGet, funcPost, funcPut, funcDelete)
 	assertsEquals(t, http.StatusOK, response.Code)
 	assertsEquals(t, false, isFuncGetCalled)
 	assertsEquals(t, false, isFuncPostCalled)
@@ -279,16 +290,16 @@ func TestRegieterMapping(t *testing.T) {
 			isFuncPutCalled = false
 			isFuncDeleteCalled = false
 		}
-		funcGet = func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+		funcGet = func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 			isFuncGetCalled = true
 		}
-		funcPost = func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+		funcPost = func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 			isFuncPostCalled = true
 		}
-		funcPut = func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+		funcPut = func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 			isFuncPutCalled = true
 		}
-		funcDelete = func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+		funcDelete = func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 			isFuncDeleteCalled = true
 		}
 		createdURLMapping urlMapping
@@ -309,19 +320,19 @@ func TestRegieterMapping(t *testing.T) {
 	assertsEquals(t, moduleName, createdURLMapping.moduleName)
 	assertsEquals(t, modelName, createdURLMapping.modelName)
 	funcReset()
-	createdURLMapping.funcGet("", response, request, context)
+	createdURLMapping.funcGet(ctx, "", response, request)
 	assertsEquals(t, true, isFuncGetCalled)
 	funcReset()
-	createdURLMapping.funcPost("", response, request, context)
+	createdURLMapping.funcPost(ctx, "", response, request)
 	assertsEquals(t, true, isFuncPostCalled)
 	funcReset()
-	createdURLMapping.funcPut("", response, request, context)
+	createdURLMapping.funcPut(ctx, "", response, request)
 	assertsEquals(t, true, isFuncPutCalled)
 	funcReset()
-	createdURLMapping.funcDelete("", response, request, context)
+	createdURLMapping.funcDelete(ctx, "", response, request)
 	assertsEquals(t, true, isFuncDeleteCalled)
 
-	context.Infof("TestResieterMapping passed.")
+	log.Infof(ctx, "TestResieterMapping passed.")
 }
 
 func TestProcess(t *testing.T) {
@@ -348,16 +359,16 @@ func TestProcess(t *testing.T) {
 			isFuncPutCalled = false
 			isFuncDeleteCalled = false
 		}
-		funcGet = func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+		funcGet = func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 			isFuncGetCalled = true
 		}
-		funcPost = func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+		funcPost = func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 			isFuncPostCalled = true
 		}
-		funcPut = func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+		funcPut = func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 			isFuncPutCalled = true
 		}
-		funcDelete = func(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+		funcDelete = func(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 			isFuncDeleteCalled = true
 		}
 	)
@@ -370,7 +381,7 @@ func TestProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(errorOnInit)
 	}
-	Process(response, request, context)
+	Process(ctx, response, request)
 	assertsEquals(t, http.StatusNotFound, response.Code)
 
 	// Success test GET
@@ -379,7 +390,7 @@ func TestProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(errorOnInit)
 	}
-	Process(response, request, context)
+	Process(ctx, response, request)
 	assertsEquals(t, http.StatusOK, response.Code)
 	assertsEquals(t, true, isFuncGetCalled)
 
@@ -389,7 +400,7 @@ func TestProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(errorOnInit)
 	}
-	Process(response, request, context)
+	Process(ctx, response, request)
 	assertsEquals(t, http.StatusOK, response.Code)
 	assertsEquals(t, true, isFuncPostCalled)
 
@@ -399,7 +410,7 @@ func TestProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(errorOnInit)
 	}
-	Process(response, request, context)
+	Process(ctx, response, request)
 	assertsEquals(t, http.StatusOK, response.Code)
 	assertsEquals(t, true, isFuncPutCalled)
 
@@ -409,9 +420,9 @@ func TestProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(errorOnInit)
 	}
-	Process(response, request, context)
+	Process(ctx, response, request)
 	assertsEquals(t, http.StatusOK, response.Code)
 	assertsEquals(t, true, isFuncDeleteCalled)
 
-	context.Infof("TestResieterMapping passed.")
+	log.Infof(ctx, "TestResieterMapping passed.")
 }

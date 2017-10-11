@@ -11,24 +11,24 @@ package todoist
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"rest"
 	"unicode/utf8"
 
-	"rest"
-
-	"appengine"
+	"google.golang.org/appengine/log"
 )
 
 // resopndConfiguration responds Configuration
-func resopndConfiguration(writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+func resopndConfiguration(context context.Context, writer http.ResponseWriter, request *http.Request) {
 	configuration, err := GetConfiguration(context)
 	if err != nil {
-		context.Errorf("Error on get Configuration. %s\n%#v", err.Error(), err)
-		rest.RespondError(writer, request, context, http.StatusInternalServerError, err.Error())
+		log.Errorf(context, "Error on get Configuration. %s\n%#v", err.Error(), err)
+		rest.RespondError(context, writer, request, http.StatusInternalServerError, err.Error())
 	}
-	rest.Respond(writer, request, context, []Configuration{configuration})
+	rest.Respond(context, writer, request, []Configuration{configuration})
 }
 
 // checkKey checks key, when key is set, return error.
@@ -40,20 +40,20 @@ func checkKey(key string) error {
 }
 
 // ReadOperation returns slice of todoist.Configuration
-func ReadOperation(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+func ReadOperation(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 	if err := checkKey(key); err != nil {
-		context.Errorf("Error occurred. (%#v)", err)
-		rest.RespondError(writer, request, context, http.StatusBadRequest, err.Error())
+		log.Errorf(context, "Error occurred. (%#v)", err)
+		rest.RespondError(context, writer, request, http.StatusBadRequest, err.Error())
 		return
 	}
-	resopndConfiguration(writer, request, context)
+	resopndConfiguration(context, writer, request)
 }
 
 // UpdateOperation updates specified todoist.Configuration
-func UpdateOperation(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
+func UpdateOperation(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
 	if err := checkKey(key); err != nil {
-		context.Errorf("Error occurred. (%#v)", err)
-		rest.RespondError(writer, request, context, http.StatusBadRequest, err.Error())
+		log.Errorf(context, "Error occurred. (%#v)", err)
+		rest.RespondError(context, writer, request, http.StatusBadRequest, err.Error())
 		return
 	}
 	var config Configuration
@@ -61,15 +61,15 @@ func UpdateOperation(key string, writer http.ResponseWriter, request *http.Reque
 	bufferBody.ReadFrom(request.Body)
 	err := json.Unmarshal(bufferBody.Bytes(), &config)
 	if err != nil {
-		context.Errorf("Error on decode JSON. %#v: JSON %s", err, bufferBody.String())
-		rest.RespondError(writer, request, context, http.StatusBadRequest, err.Error())
+		log.Errorf(context, "Error on decode JSON. %#v: JSON %s", err, bufferBody.String())
+		rest.RespondError(context, writer, request, http.StatusBadRequest, err.Error())
 		return
 	}
 	_, err = SetConfiguration(context, config)
 	if err != nil {
-		context.Errorf("Error on put Configuration. %#v (%#v)", err, config)
-		rest.RespondError(writer, request, context, http.StatusInternalServerError, err.Error())
+		log.Errorf(context, "Error on put Configuration. %#v (%#v)", err, config)
+		rest.RespondError(context, writer, request, http.StatusInternalServerError, err.Error())
 		return
 	}
-	resopndConfiguration(writer, request, context)
+	resopndConfiguration(context, writer, request)
 }

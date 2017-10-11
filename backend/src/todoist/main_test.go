@@ -10,15 +10,18 @@
 package todoist
 
 import (
+	"context"
+	"net/http"
 	"testing"
 
-	"appengine/aetest"
+	"google.golang.org/appengine/aetest"
 )
 
 // Test Configure
 func TestConfigure(t *testing.T) {
 	var (
-		context aetest.Context
+		context context.Context
+		done    func()
 		config  Configuration
 		config2 Configuration
 		err     error
@@ -26,11 +29,11 @@ func TestConfigure(t *testing.T) {
 	)
 
 	// Try to get aetest.Context
-	context, err = aetest.NewContext(nil)
+	context, done, err = aetest.NewContext()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer context.Close()
+	defer done()
 
 	// Try to get new Configuration
 	config, err = GetConfiguration(context)
@@ -50,4 +53,27 @@ func TestConfigure(t *testing.T) {
 	if config.APIKey != apiKey {
 		t.Errorf("got %v\nwant %v", config2.APIKey, apiKey)
 	}
+}
+
+func TestSync(t *testing.T) {
+	var (
+		response *http.Response
+		context  context.Context
+		done     func()
+		err      error
+	)
+
+	// Try to get aetest.Context
+	context, done, err = aetest.NewContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done()
+
+	// Try to sync Todoist
+	response, err = Sync(context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Resp: %#v", response)
 }

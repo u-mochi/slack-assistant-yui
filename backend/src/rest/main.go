@@ -11,6 +11,7 @@ package rest
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,7 +19,7 @@ import (
 	"net/url"
 	"strings"
 
-	"appengine"
+	"google.golang.org/appengine/log"
 )
 
 const (
@@ -56,13 +57,13 @@ type urlMapping struct {
 	// Identifier of Model in URL (ie. configure of /api/todoist/configure/somekey)
 	identifier string
 	// Function on GET Method
-	funcGet func(string, http.ResponseWriter, *http.Request, appengine.Context)
+	funcGet func(context.Context, string, http.ResponseWriter, *http.Request)
 	// Function on POST Method
-	funcPost func(string, http.ResponseWriter, *http.Request, appengine.Context)
+	funcPost func(context.Context, string, http.ResponseWriter, *http.Request)
 	// Function on PUT Method
-	funcPut func(string, http.ResponseWriter, *http.Request, appengine.Context)
+	funcPut func(context.Context, string, http.ResponseWriter, *http.Request)
 	// Function on DELETE Method
-	funcDelete func(string, http.ResponseWriter, *http.Request, appengine.Context)
+	funcDelete func(context.Context, string, http.ResponseWriter, *http.Request)
 }
 
 // Initialize this package
@@ -71,7 +72,7 @@ func init() {
 }
 
 // selectMapping selects registered urlMapping matches specified URL
-func selectMapping(url *url.URL, context appengine.Context) (*urlMapping, string, error) {
+func selectMapping(context context.Context, url *url.URL) (*urlMapping, string, error) {
 	paths := strings.Split(strings.Trim(url.Path, URLPathSeparator), URLPathSeparator)
 	if len(paths) > 2 {
 		for _, mapping := range urlMappings {
@@ -83,37 +84,41 @@ func selectMapping(url *url.URL, context appengine.Context) (*urlMapping, string
 			}
 		}
 	}
-	context.Infof("mapping of %s not found in %#v", url.Path, urlMappings)
+	log.Infof(context, "mapping of %s not found in %#v", url.Path, urlMappings)
 	return new(urlMapping), "", errors.New(ErrorURLMappingUnMatch)
 }
 
 // HandleRequest selects function to respend
-func handleRequest(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context, funcGet func(string, http.ResponseWriter, *http.Request, appengine.Context), funcPost func(string, http.ResponseWriter, *http.Request, appengine.Context), funcPut func(string, http.ResponseWriter, *http.Request, appengine.Context), funcDelete func(string, http.ResponseWriter, *http.Request, appengine.Context)) {
+func handleRequest(context context.Context, key string, writer http.ResponseWriter, request *http.Request,
+	funcGet func(context.Context, string, http.ResponseWriter, *http.Request),
+	funcPost func(context.Context, string, http.ResponseWriter, *http.Request),
+	funcPut func(context.Context, string, http.ResponseWriter, *http.Request),
+	funcDelete func(context.Context, string, http.ResponseWriter, *http.Request)) {
 	switch request.Method {
 	case MethodGet:
-		funcGet(key, writer, request, context)
+		funcGet(context, key, writer, request)
 		return
 	case MethodPost:
-		funcPost(key, writer, request, context)
+		funcPost(context, key, writer, request)
 		return
 	case MethodPut:
-		funcPut(key, writer, request, context)
+		funcPut(context, key, writer, request)
 		return
 	case MethodDelete:
-		funcDelete(key, writer, request, context)
+		funcDelete(context, key, writer, request)
 		return
 	default:
-		RespondMethodNotAllowed(key, writer, request, context)
+		RespondMethodNotAllowed(context, key, writer, request)
 	}
 }
 
 // RespondMethodNotAllowed responds as HTTP 405 Method Mot Allowed
-func RespondMethodNotAllowed(key string, writer http.ResponseWriter, request *http.Request, context appengine.Context) {
-	RespondError(writer, request, context, http.StatusMethodNotAllowed, fmt.Sprintf("%s Method Not Allowed to %s", request.Method, request.URL))
+func RespondMethodNotAllowed(context context.Context, key string, writer http.ResponseWriter, request *http.Request) {
+	RespondError(context, writer, request, http.StatusMethodNotAllowed, fmt.Sprintf("%s Method Not Allowed to %s", request.Method, request.URL))
 }
 
 // RespondError responds specified error
-func RespondError(writer http.ResponseWriter, request *http.Request, context appengine.Context, status int, args ...interface{}) {
+func RespondError(context context.Context, writer http.ResponseWriter, request *http.Request, status int, args ...interface{}) {
 	messages := make([]string, len(args))
 	for index, arg := range args {
 		messages[index] = fmt.Sprint(arg)
@@ -127,8 +132,8 @@ func RespondError(writer http.ResponseWriter, request *http.Request, context app
 	buffer := new(bytes.Buffer)
 	err := json.NewEncoder(buffer).Encode(data)
 	if err != nil {
-		context.Errorf("%#v", err)
-		RespondError(writer, request, context, http.StatusInternalServerError, err.Error())
+		log.Errorf(context, "%#v", err)
+		RespondError(context, writer, request, http.StatusInternalServerError, err.Error())
 	} else {
 		writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 		http.Error(writer, buffer.String(), status)
@@ -136,17 +141,21 @@ func RespondError(writer http.ResponseWriter, request *http.Request, context app
 }
 
 // Respond responds specified interface as JSON
-func Respond(writer http.ResponseWriter, request *http.Request, context appengine.Context, data interface{}) {
+func Respond(context context.Context, writer http.ResponseWriter, request *http.Request, data interface{}) {
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	err := json.NewEncoder(writer).Encode(data)
 	if err != nil {
-		context.Errorf("%#v", err)
-		RespondError(writer, request, context, http.StatusInternalServerError, err.Error())
+		log.Errorf(context, "%#v", err)
+		RespondError(context, writer, request, http.StatusInternalServerError, err.Error())
 	}
 }
 
 // RegieterMapping registers mapping of relation between model and URL
-func RegieterMapping(prefix string, moduleName string, modelName string, funcGet func(string, http.ResponseWriter, *http.Request, appengine.Context), funcPost func(string, http.ResponseWriter, *http.Request, appengine.Context), funcPut func(string, http.ResponseWriter, *http.Request, appengine.Context), funcDelete func(string, http.ResponseWriter, *http.Request, appengine.Context)) {
+func RegieterMapping(prefix string, moduleName string, modelName string,
+	funcGet func(context.Context, string, http.ResponseWriter, *http.Request),
+	funcPost func(context.Context, string, http.ResponseWriter, *http.Request),
+	funcPut func(context.Context, string, http.ResponseWriter, *http.Request),
+	funcDelete func(context.Context, string, http.ResponseWriter, *http.Request)) {
 	urlMappings = append(urlMappings, urlMapping{
 		prefix:     prefix,
 		moduleName: moduleName,
@@ -159,15 +168,15 @@ func RegieterMapping(prefix string, moduleName string, modelName string, funcGet
 }
 
 // Process processes REST operation
-func Process(writer http.ResponseWriter, request *http.Request, context appengine.Context) {
-	mapping, key, err := selectMapping(request.URL, context)
+func Process(context context.Context, writer http.ResponseWriter, request *http.Request) {
+	mapping, key, err := selectMapping(context, request.URL)
 	if err != nil {
 		if err.Error() == ErrorURLMappingUnMatch {
-			RespondError(writer, request, context, http.StatusNotFound, fmt.Sprintf("%s is not found on this server.", request.URL.Path))
+			RespondError(context, writer, request, http.StatusNotFound, fmt.Sprintf("%s is not found on this server.", request.URL.Path))
 			return
 		}
-		RespondError(writer, request, context, http.StatusInternalServerError, err.Error())
+		RespondError(context, writer, request, http.StatusInternalServerError, err.Error())
 		return
 	}
-	handleRequest(key, writer, request, context, mapping.funcGet, mapping.funcPost, mapping.funcPut, mapping.funcDelete)
+	handleRequest(context, key, writer, request, mapping.funcGet, mapping.funcPost, mapping.funcPut, mapping.funcDelete)
 }
