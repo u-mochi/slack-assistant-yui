@@ -14,7 +14,7 @@ import (
 	"rest"
 	"todoist"
 
-	"appengine"
+	"google.golang.org/appengine"
 )
 
 const (
@@ -29,5 +29,5 @@ func init() {
 
 // handler processes requests
 func handler(writer http.ResponseWriter, request *http.Request) {
-	rest.Process(writer, request, appengine.NewContext(request))
+	rest.Process(appengine.NewContext(request), writer, request)
 }

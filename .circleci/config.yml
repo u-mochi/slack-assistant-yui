@@ -1,0 +1,69 @@
+version: 2
+jobs:
+  build:
+    working_directory: /home/circleci/slack-assistant-yui
+    docker:
+      - image: mercari/appengine-go:1.8
+    environment:
+      TZ: "/usr/share/zoneinfo/Asia/Tokyo"
+    steps:
+      - checkout
+      - restore_cache:
+          key: server-{{ .Revision }}
+      # setup backend
+      - run:
+          name: Setup GAE/Go
+          command: |
+            echo 'export GOROOT=/work/go_appengine/goroot-1.8' >> $BASH_ENV
+            echo 'export GOPATH=/work/go_appengine/gopath:/home/circleci/slack-assistant-yui/backend' >> $BASH_ENV
+            source $BASH_ENV
+            goapp get google.golang.org/appengine
+            goapp build
+          working_directory: ./backend/src
+      # test backend
+      - run:
+          name: Run GAE/Go test
+          command: |
+            goapp test ./...
+          working_directory: ./backend/src
+      - save_cache:
+          key: server-{{ .Branch }}
+          paths:
+            - /work/go_appengine/goroot-1.8
+
+  build_client:
+    working_directory: /home/circleci/slack-assistant-yui
+    docker:
+      - image: circleci/node:6.10-browsers
+    environment:
+      TZ: "/usr/share/zoneinfo/Asia/Tokyo"
+      DISPLAY: ":99"
+      CHROME_BIN: "/usr/bin/google-chrome"
+    steps:
+      - checkout
+      - restore_cache:
+          key: client-{{ .Revision }}
+      # start vvfb
+      - run:
+          name: Starting Xvfb (for Browser Tests)
+          command: Xvfb :99 -screen 0 1280x1024x24
+          background: true
+          working_directory: ./frontend
+      # test frontend
+      - run:
+          name: Run NPM test
+          command: |
+            npm install
+            npm run test:all
+          working_directory: ./frontend
+      - save_cache:
+          key: client-{{ .Branch }}
+          paths:
+            - /home/circleci/slack-assistant-yui/frontend/node_modules
+
+workflows:
+    version: 2
+    build_and_test:
+        jobs:
+            - build
+            - build_client

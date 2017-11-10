@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"appengine/aetest"
+	"google.golang.org/appengine/aetest"
 )
 
 // createRequest creates Request and ResponseRecorder
@@ -46,11 +46,11 @@ func TestReadOperation(t *testing.T) {
 	)
 
 	// Try to get aetest.Context
-	context, err := aetest.NewContext(nil)
+	context, done, err := aetest.NewContext()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer context.Close()
+	defer done()
 
 	request, response, err = createRequest("test", rest.MethodOption, new(strings.Reader))
 	if err != nil {
@@ -58,7 +58,7 @@ func TestReadOperation(t *testing.T) {
 	}
 
 	// Try to get new Configuration
-	ReadOperation("", response, request, context)
+	ReadOperation(context, "", response, request)
 	assertsEquals(t, http.StatusOK, response.Code)
 	err = json.Unmarshal(response.Body.Bytes(), &configs)
 	if err != nil {
@@ -77,7 +77,7 @@ func TestReadOperation(t *testing.T) {
 
 	//Fail test
 	response = httptest.NewRecorder()
-	ReadOperation("testkey", response, request, context)
+	ReadOperation(context, "testkey", response, request)
 	assertsEquals(t, http.StatusBadRequest, response.Code)
 }
 
@@ -93,11 +93,11 @@ func TestUpdateOperation(t *testing.T) {
 	)
 
 	// Try to get aetest.Context
-	context, err := aetest.NewContext(nil)
+	context, done, err := aetest.NewContext()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer context.Close()
+	defer done()
 
 	// Try to get new Configuration
 	config1, err = GetConfiguration(context)
@@ -114,7 +114,7 @@ func TestUpdateOperation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	UpdateOperation("", response, request, context)
+	UpdateOperation(context, "", response, request)
 
 	err = json.Unmarshal(response.Body.Bytes(), &configs)
 	if err != nil {
@@ -133,6 +133,6 @@ func TestUpdateOperation(t *testing.T) {
 
 	//Fail test
 	response = httptest.NewRecorder()
-	UpdateOperation("testkey", response, request, context)
+	UpdateOperation(context, "testkey", response, request)
 	assertsEquals(t, http.StatusBadRequest, response.Code)
 }

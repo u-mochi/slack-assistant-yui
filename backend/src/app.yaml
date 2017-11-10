@@ -1,5 +1,3 @@
-application: slack-assistant-yui
-version: 0-00-001
 runtime: go
 api_version: go1.8
 threadsafe: yes

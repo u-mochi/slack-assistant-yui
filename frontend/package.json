@@ -7,7 +7,7 @@
     "build:prod": "webpack --config ./webpack.config.prod.js",
     "test:ut": "karma start karma.conf.js",
     "test:all": "karma start karma.conf.js **/*.spec.tsx **/*.spec.ts",
-    "server": "node dev-server.js"
+    "start": "node dev-server.js"
   },
   "repository": {
     "type": "git",
